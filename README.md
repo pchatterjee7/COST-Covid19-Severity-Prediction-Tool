@@ -11,6 +11,8 @@ Here, we created a workflow to predict COVID-19 disease severity based on NK cel
 
 ### **How to use the app**
 Go to the [COST](https://genapp2022.biosci.gatech.edu/team7/), read the instructions, upload your data, press *Predict*.
+![](assets/COST_UI.jpg)
+![](assets/COST_RESULTS.jpg)
 
 
 ### **Developers**
