@@ -14,6 +14,6 @@ Go to the [COST](https://genapp2022.biosci.gatech.edu/team7/), read the instruct
 
 
 ### **Developers**
-[Mariam Nawaz](https://github.com/mariamnawaz1)<br>
-[Neharika Bhatia](link)<br>
-[Paramita Chatterjee](link)
+* [Mariam Nawaz](https://github.com/mariamnawaz1)<br>
+* [Neharika Bhatia](link)<br>
+* [Paramita Chatterjee](link)
