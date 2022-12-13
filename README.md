@@ -1,4 +1,4 @@
-# **COST** - A **CO**VID-19 **S**EVERITY PREDICTION **T**OOL
+# **COST** - A *CO*VID-19 *S*EVERITY PREDICTION *T*OOL
 ## <div align="center">(COVID-19 Triage Tool)</div><br> 
 
 ### ***By Mariam Nawaz, Neharika Bhatia, Paramita Chatterjee***<br><br>
