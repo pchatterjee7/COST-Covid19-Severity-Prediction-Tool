@@ -1,0 +1,154 @@
+---
+title: "scRNA Random Forest"
+author: "Paramita Chatterjee"
+date: "2022-12-13"
+output: html_document
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+###random Forest ###Load libraries
+
+library(Seurat) library(tidyverse) library(tidymodels)
+library(scCustomize) \# for plotting library(patchwork)
+
+## This method is taken from DNACONFESS blog and was modified for our application
+
+## read bonn nad berlin data from the paper Schulte-Schrepping et al. 2020
+
+berlin \<-
+readRDS("seurat_COVID19_NK_cohort2_Berlin_Rainer_FG_2021-06-07.RDS")
+
+View([berlin\@meta.data](mailto:berlin@meta.data){.email})
+
+bonn \<-
+readRDS("seurat_COVID19_NK_cohort1_Bonn_Rainer_FG_2021-06-07.RDS")
+
+## subset bonn to keep only moderate and severe data
+
+View(bonn)
+
+View([bonn\@meta.data](mailto:bonn@meta.data){.email})
+
+bonn \<- subset(bonn, subset = group_per_sample ==
+c("moderate","severe"))
+
+saveRDS(bonn, file = "bonn_mild_severe_noage.rds")
+
+## subset berlin to keep only mild and severe data
+
+View(berlin)
+
+View([berlin\@meta.data](mailto:berlin@meta.data){.email})
+
+berlin \<- subset(berlin, subset = group_per_sample ==
+c("mild","severe"))
+
+saveRDS(berlin, file = "berlin_mild_severe_noage.rds")
+
+## Merge the datasets
+
+merged_seurat \<- merge(x = bonn, y = berlin, add.cell.id = c("bonn",
+"berlin"))
+
+View(merged_seurat)
+
+View([merged_seurat\@meta.data](mailto:merged_seurat@meta.data){.email})
+
+##separate mild and moderate data from severe data mild \<-
+subset(merged_seurat, subset = group_per_patient ==
+c("mild","moderate"))
+
+severe \<- subset(merged_seurat, subset = group_per_patient ==
+c("severe"))
+
+#re-merge to have the separated data stored merged \<- merge(x = mild, y
+= severe, add.cell.id = c("mild", "severe"))
+
+## Save object
+
+saveRDS(merged, file = "merged_bonn_berlin_mild_severe.rds")
+
+Idents(merged)\<- merged\$cell_type
+
+## re-process the data, as the most-variable genes will change when you only have mild/moderate and severe cells vs all cells. use log normalized data
+
+merged \<- merged %\>% NormalizeData(normalization.method =
+"LogNormalize", scale.factor = 10000) %\>%
+FindVariableFeatures(selection.method = "vst", nfeatures = 2000) %\>%
+ScaleData() %\>% RunPCA(verbose = FALSE) %\>% FindNeighbors(dims = 1:10,
+verbose = FALSE) %\>% FindClusters(resolution = 0.1, verbose = FALSE)
+%\>% RunUMAP(dims = 1:10, verbose = FALSE)
+
+View(merged)
+
+View([merged\@meta.data](mailto:merged@meta.data){.email})
+
+data\<-
+[merged\@assays](mailto:merged@assays){.email}\$[RNA\@scale.data](mailto:RNA@scale.data){.email}
+
+dim(data)
+
+\# [1] 2000 5984
+
+data\<- t(data) %\>% as.data.frame()
+
+dim(data)
+
+\# [1] 5984 2000
+
+## add the cell type/the outcome/y to the dataframe
+
+data$condition <- merged$group_per_patient
+
+data\$cell_barcode\<- rownames(data)
+
+## it is important to turn it to a factor for classification
+
+data$condition<- factor(data$condition)
+
+##Prepare for model training data_split \<- initial_split(data, strata =
+"condition") data_train \<- training(data_split) data_test \<-
+testing(data_split)
+
+# 10 fold cross validation
+
+data_fold \<- vfold_cv(data_train, v = 10)
+
+#run random forest rf_recipe \<- recipe(formula = condition \~ ., data =
+data_train) %\>% update_role(cell_barcode, new_role = "ID") %\>%
+step_zv(all_predictors())
+
+## feature importance sore to TRUE
+
+rf_recipe \<- recipe(formula = condition \~ ., data = data_train) %\>%
+update_role(cell_barcode, new_role = "ID") %\>%
+step_zv(all_predictors()) rf_spec \<- rand_forest() %\>%
+set_engine("randomForest", importance = TRUE) %\>%
+set_mode("classification") rf_workflow \<- workflow() %\>%
+add_recipe(rf_recipe) %\>% add_model(rf_spec) rf_fit \<-
+fit(rf_workflow, data = data_train)
+
+## confusion matrix, perfect classification!
+
+predict(rf_fit, new_data = data_test) %\>% bind_cols(data_test %\>%
+select(condition)) %\>% conf_mat(truth = condition, estimate =
+.pred_class) \# Truth \# Prediction mild moderate severe \# mild 161 0
+10 \# moderate 0 727 262 \# severe 36 1 301
+
+rf_fit %\>% extract_fit_parsnip() %\>% vip::vip(geom = "col",
+num_features = 25) + theme_bw(base_size = 14)+ labs(title = "Random
+forest variable importance")
+
+rf_fit %\>% extract_fit_parsnip() %\>% vip::vi_model() %\>%
+arrange(desc(abs(Importance))) %\>% head(n = 20)
+
+rf_features\<- rf_fit %\>% extract_fit_parsnip() %\>% vip::vi_model()
+%\>% arrange(desc(abs(Importance))) %\>% head(n = 20) %\>%
+pull(Variable)
+
+##visualize the raw data Idents(merged)\<- merged\$group_per_patient
+
+scCustomize::Stacked_VlnPlot(merged, features = rf_features, colors_use
+= c("blue", "red", "green"))
